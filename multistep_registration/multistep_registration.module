@@ -1,0 +1,156 @@
+<?php
+
+use Drupal\Core\Form\FormStateInterface;
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function multistep_registration_form_user_register_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  $totalSteps = 3;
+  $fields = getFields();
+  // Checking if step value is already set.
+  if(!$form_state->has('step')) {
+    $form_state->set('step', 1);
+  }
+
+  // Validate the fields of the appropriate steps.
+  $validation = [];
+
+  // Disable all the fields to begin.
+  foreach ($fields as $page => $fields) {
+    if ($page != $form_state->get('step')) {
+      foreach ($fields as $field) {
+        if (is_array($field)) {
+          foreach ($field as $innerField) {
+            $form['account'][$innerField]['#access'] = FALSE;
+          }
+        }
+        else {
+          $form[$field]['#access'] = FALSE;
+        }
+      }
+    }
+    else {
+      foreach ($fields as $field) {
+        array_push($validation, [$field]);
+      }
+    }
+  }
+
+  array_unshift($form['#validate'], 'multistep_registration_pre_submit');
+
+  // Next & previous buttons.
+  $form['form_actions']['#type'] = 'actions';
+  $form['form_actions']['#weight'] = 90;
+  $form['form_actions']['next'] = [
+    '#type' => 'submit',
+    '#value' => t('Next'),
+    '#submit' => [
+      'multistep_registration_callback_form_submit',
+    ],
+    '#limit_validation_errors' => $validation,
+    '#access' => FALSE,
+//    '#weight' => -10,
+  ];
+
+  $form['form_actions']['prev'] = [
+    '#type' => 'submit',
+    '#value' => t('Back'),
+    '#submit' => [
+      'multistep_registration_callback_form_submit',
+    ],
+    '#limit_validation_errors' => $validation,
+    '#access' => FALSE,
+//    '#weight' => 99,
+  ];
+
+  // Enable next button when needed.
+  if ($form_state->get('step') < $totalSteps) {
+    $form['form_actions']['next']['#access'] = TRUE;
+  }
+
+  // Enable previous button when needed.
+  if ($form_state->get('step') > 1 && $form_state->get('step') <= $totalSteps) {
+    $form['form_actions']['prev']['#access'] = TRUE;
+  }
+}
+
+/**
+ * @param $form
+ * @param \Drupal\Core\Form\FormStateInterface $form_state
+ *
+ * @return void
+ */
+function multistep_registration_callback_form_submit($form, FormStateInterface $form_state) {
+  $fields = getFields();
+
+  // Setup our page values variable.
+  if (!$form_state->get('page_values')){
+    $page_values = [];
+  }
+  else {
+    $page_values = $form_state->get('page_values');
+  }
+
+  $currentStep = $form_state->get('step');
+  if ($form_state->getValue('next')) {
+    $page_values[$currentStep] = $form_state-> getValues();
+    $currentStep++;
+  }
+  elseif ($form_state->getValue('prev')) {
+    $currentStep--;
+  }
+
+  $form_state->set('step', $currentStep);
+  $form_state->set('page_values', $page_values);
+  $form_state->setRebuild(TRUE);
+}
+
+/**
+ * @param $form
+ * @param \Drupal\Core\Form\FormStateInterface $form_state
+ *
+ * @return void
+ */
+function multistep_registration_pre_submit($form, Drupal\Core\Form\FormStateInterface $form_state) {
+  // Load the submitted values.
+  $page_values = $form_state->get('page_values');
+  $submitted_values = $form_state->getValues();
+  // Put all the paged values back into the form_state values.
+  foreach ($page_values as $page_num => $fields) {
+    unset($fields['next']);
+    unset($fields['op']);
+    foreach ($fields as $key => $value) {
+      $submitted_values[$key] = $value;
+    }
+  }
+
+  // Save the form_state values for further processing.
+  $form_state->setValue('field_date_of_birth', '1922-12-12');
+  $form_state->setValues($submitted_values);
+}
+
+/**
+ * @return array
+ */
+function getFields() {
+  $fields[1] = [
+    'account',
+    'mail',
+    'name',
+    'pass'
+  ];
+  $fields[2] = [
+    'field_first_name',
+    'field_last_name',
+    'field_date_of_birth',
+    'field_country_of_residence',
+  ];
+  $fields[3] = [
+    'field_favorite_type_of_pizza',
+    'actions'
+  ];
+
+  return $fields;
+}
+

@@ -1,0 +1,7 @@
+langcode: en
+status: true
+dependencies: {  }
+name: 'Pizza Types'
+vid: pizza_types
+description: ''
+weight: 0
